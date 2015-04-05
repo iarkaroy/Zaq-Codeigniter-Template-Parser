@@ -8,7 +8,7 @@ class Zaq {
     protected $_r_delimiter_pattern = '';
     protected $_zaq_file;
     protected $_zaq_path;
-    protected $CI;
+    public $CI;
     protected $_reserved = array(
         'foreach', 'as', 'if', 'elif', 'else', '/',
     );
@@ -20,9 +20,10 @@ class Zaq {
     protected $_phps = array();
     protected $_php_prefix = 'ZAQ_PHP_';
     protected $_contents;
-    protected $_code;
+    protected $_code_raw;
     protected $_code_parsed;
-    protected $_code_parts = array();
+    protected $_code_raw_parts = array();
+    protected $_code_parsed_parts = array();
     protected $_to_unshift = array();
     protected $_to_push = array();
     protected $_config;
@@ -105,19 +106,27 @@ class Zaq {
     }
 
     protected function _process($matches) {
-        $this->_code = trim($matches[1]);
+        $this->_code_raw = trim($matches[1]);
         $this->_preserve_strings();
         $this->_expand();
         $this->_trim();
         $this->_split();
         $this->_decode();
+        $this->_unshift();
+        $this->_push();
+        if (end($this->_code_parsed_parts) != ':') {
+            $this->_code_parsed_parts[] = ';';
+        }
+        $this->_code_parsed = implode(' ', $this->_code_parsed_parts);
+        $this->_restore_strings();
         $this->_contract();
-        return $this->_code_parsed;
+        $this->_code_parsed = trim($this->_code_parsed);
+        return '<?php ' . $this->_code_parsed . ' ?>';
     }
 
     protected function _preserve_strings() {
         $this->_strings = array();
-        $this->_code = preg_replace_callback('/([\'\"])(.*?)\1/', array($this, '_store_string'), $this->_code);
+        $this->_code_raw = preg_replace_callback('/([\'\"])(.*?)\1/', array($this, '_store_string'), $this->_code_raw);
     }
 
     protected function _store_string($matches) {
@@ -127,22 +136,24 @@ class Zaq {
     }
 
     protected function _restore_strings() {
-        
+        foreach ($this->_strings as $i => $str) {
+            $this->_code_parsed = str_replace('@@@' . $this->_str_prefix . $i . '@@@', $str, $this->_code_parsed);
+        }
     }
 
     protected function _expand() {
         foreach ($this->_symbols as $symbol) {
-            $this->_code = str_replace($symbol, ' ' . $symbol . ' ', $this->_code);
+            $this->_code_raw = str_replace($symbol, ' ' . $symbol . ' ', $this->_code_raw);
         }
     }
 
     protected function _trim() {
-        $this->_code = preg_replace('/\s+/', ' ', $this->_code);
-        $this->_code = trim($this->_code);
+        $this->_code_raw = preg_replace('/\s+/', ' ', $this->_code_raw);
+        $this->_code_raw = trim($this->_code_raw);
     }
 
     protected function _split() {
-        $this->_code_parts = explode(' ', $this->_code);
+        $this->_code_raw_parts = explode(' ', $this->_code_raw);
     }
 
     protected function _contract() {
@@ -159,37 +170,33 @@ class Zaq {
         $this->_to_unshift = array();
         $this->_to_push = array();
         $pos = 0;
-        $fin = array();
-        foreach ($this->_code_parts as $p) {
+        $this->_code_parsed_parts = array();
+        foreach ($this->_code_raw_parts as $p) {
             if (in_array($p, $this->_reserved)) { // reserved code
-                $fin[] = $this->_decode_reserved($p, $pos);
+                $this->_code_parsed_parts[] = $this->_decode_reserved($p, $pos);
             } else if (in_array($p, $this->_symbols)) { // symbol
-                $fin[] = $this->_decode_symbol($p, $pos);
+                $this->_code_parsed_parts[] = $this->_decode_symbol($p, $pos);
             } else {
-                $fin[] = $this->_decode_string($p, $pos);
+                $this->_code_parsed_parts[] = $this->_decode_string($p, $pos);
             }
             $pos++;
         }
+    }
+    
+    protected function _unshift() {
         foreach ($this->_to_unshift as $unshift) {
-            array_unshift($fin, $unshift);
+            array_unshift($this->_code_parsed_parts, $unshift);
         }
+    }
+    
+    protected function _push() {
         foreach ($this->_to_push as $push) {
-            array_push($fin, $push);
+            array_push($this->_code_parsed_parts, $push);
         }
-
-        if (end($fin) != ':') {
-            $fin[] = ';';
-        }
-        $final_code = implode(' ', $fin);
-        foreach ($this->_strings as $i => $str) {
-            $final_code = str_replace('@@@' . $this->_str_prefix . $i . '@@@', $str, $final_code);
-        }
-        $final_code = '<?php ' . trim($final_code) . ' ?>';
-        $this->_code_parsed = $final_code;
     }
 
     protected function _decode_reserved($code, $position) {
-        if ($code == '/') {
+        if ($code == '/' AND $position == 0) {
             return '';
         }
         if ($code == 'if' || $code == 'foreach') {
@@ -213,12 +220,12 @@ class Zaq {
     }
 
     protected function _is_end() {
-        return $this->_code_parts[0] == '/';
+        return $this->_code_raw_parts[0] == '/';
     }
 
     protected function _decode_symbol($code, $position) {
         if ($code == '=') {
-            if ($this->_code_parts[0] == 'foreach') {
+            if ($this->_code_raw_parts[0] == 'foreach') {
                 return '=>';
             }
         }
@@ -238,7 +245,7 @@ class Zaq {
         if (preg_match('/^\w.*/', $code)) {
             $next = $position + 1;
             $prev = $position - 1;
-            if ((isset($this->_code_parts[$next]) AND $this->_code_parts[$next] == '(') OR (isset($this->_code_parts[$prev]) AND $this->_code_parts[$prev] == '->') ) {
+            if ((isset($this->_code_raw_parts[$next]) AND $this->_code_raw_parts[$next] == '(') OR (isset($this->_code_raw_parts[$prev]) AND $this->_code_raw_parts[$prev] == '->') ) {
                 return $code;
             }
             $code = '$' . $code;
