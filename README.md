@@ -85,11 +85,15 @@ Usage
 
 #### More...
 ````
-<?php echo date ( 'Y-m-d H:i:s' , $now ) ; ?>					{date('Y-m-d H:i:s', now)}
+{date('Y-m-d H:i:s', now)}
+<?php echo date ( 'Y-m-d H:i:s' , $now ) ; ?>
 
-<?php echo time ( ) ; ?>							{time()}
+{time()}
+<?php echo time ( ) ; ?>
 
-<?php echo $fname . $lname ; ?>							{fname . lname}
+{fname . lname}
+<?php echo $fname . $lname ; ?>
 
-<?php echo $books -> get_by_author( $author ) -> first() -> title ; ?>		{books->get_by_author(author)->first()->title}
+{books->get_by_author(author)->first()->title}
+<?php echo $books -> get_by_author( $author ) -> first() -> title ; ?>
 ````
