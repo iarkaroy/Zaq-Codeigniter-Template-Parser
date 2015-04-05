@@ -53,7 +53,7 @@ Usage
 ```
 
 #### Zaq Code
-```php
+```
 {if products}
     <ul>
     {foreach products as product}
@@ -64,3 +64,32 @@ Usage
     <span>No product found.</span>
 {/if}
 ```
+
+#### Intended Code
+```php
+<ul>
+<?php foreach ( $options as $item => $value ) : ?>
+    <li><?php echo $item ; ?> => <?php echo $value ; ?></li>
+<?php endforeach ; ?>
+</ul>
+```
+
+#### Zaq Code
+```
+<ul>
+{foreach options as item = value}
+    <li>{item} => {value}</li>
+{/foreach}
+</ul>
+```
+
+#### More...
+````
+<?php echo date ( 'Y-m-d H:i:s' , $now ) ; ?>					{date('Y-m-d H:i:s', now)}
+
+<?php echo time ( ) ; ?>							{time()}
+
+<?php echo $fname . $lname ; ?>							{fname . lname}
+
+<?php echo $books -> get_by_author( $author ) -> first() -> title ; ?>		{books->get_by_author(author)->first()->title}
+````
