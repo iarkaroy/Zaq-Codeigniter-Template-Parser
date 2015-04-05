@@ -97,3 +97,10 @@ Usage
 {books->get_by_author(author)->first()->title}
 <?php echo $books -> get_by_author( $author ) -> first() -> title ; ?>
 ````
+
+For constants, use #...
+```
+{if defined('APP_VERSION') && #APP_VERSION > 2.0}
+	... do something ...
+{/if}
+```
