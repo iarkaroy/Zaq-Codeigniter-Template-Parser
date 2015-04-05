@@ -3,6 +3,7 @@ Zaq: Codeigniter Template Parser Engine
 
 Zaq is a PHP based template parser engine developed to work with Codeigniter.
 
+
 Installation
 ------------
 
@@ -24,4 +25,42 @@ Initialization
 
 ```php
 $this->load->library('zaq');
+```
+
+
+Parse View Syntax
+-----------------
+
+```php
+$this->zaq->parse( $view, $data = array(), $return = FALSE );
+```
+
+
+Usage
+-----
+
+#### Intended Code
+```php
+<?php if ( $products ) : ?>
+    <ul>
+    <?php foreach ( $products as $product ) : ?>
+        <li><a href="<?php echo $product['link'] ; ?>"><?php echo $product['title'] ; ?> (<?php echo $product['price'] ; ?>)</a></li>
+    <?php endforeach ; ?>
+    </ul>
+<?php else : ?>
+    <span>No product found.</span>
+<?php endif ; ?>
+```
+
+#### Zaq Code
+```php
+{if products}
+    <ul>
+    {foreach products as product}
+        <li><a href="{product[link]}">{product[title]} ({product[price]})</a></li>
+    {/foreach}
+    </ul>
+{else}
+    <span>No product found.</span>
+{/if}
 ```
