@@ -6,8 +6,10 @@ class Zaq {
     protected $_r_delimiter = '}';
     protected $_l_delimiter_pattern = '';
     protected $_r_delimiter_pattern = '';
-    protected $_zaq_file;
-    protected $_zaq_path;
+    protected $_cache_file;
+    protected $_cache_dir;
+    protected $_cache_path;
+    protected $_enable_cache;
     public $CI;
     protected $_reserved = array(
         'foreach', 'as', 'if', 'elif', 'else', '/',
@@ -30,50 +32,70 @@ class Zaq {
     protected $_exclude_patterns = array(
         'false', 'true', 'null', '\d.*',
     );
+    protected $_exceptions = array();
 
     function __construct() {
         $this->CI = & get_instance();
         $this->_set_delimiter_patterns();
         $this->CI->config->load('zaq', TRUE);
         $this->_config = $this->CI->config->item('zaq');
+        $this->_cache_dir = rtrim($this->_config['cache_dir'], '/') . '/';
         $this->_check_cache_dir();
+        $this->CI->load->add_package_path($this->_cache_dir);
+        $this->add_exception(['elapsed_time', 'memory_usage']);
+        $this->_enable_cache = isset($this->_config['enable_cache']) ? (bool) $this->_config['enable_cache'] : TRUE;
     }
 
     public function parse($view, $data = array(), $return = FALSE) {
-        $time_start = microtime(TRUE);
+        $this->CI->benchmark->mark('zaq_parse_start');
 
         $view_file = VIEWPATH . $view . '.php';
 
         if (!is_file($view_file) OR ! is_readable($view_file)) {
-            return FALSE;
+            die('Unable to load view: ' . $view);
+        }
+
+        $this->_cache_file = md5($view_file);
+        $this->_cache_path = $this->_cache_dir . 'views/' . $this->_cache_file . '.php';
+
+        if (!$this->_enable_cache OR ! $this->_cache_valid($view_file, $this->_cache_path)) {
+            $this->_contents = file_get_contents($view_file);
+            $this->_preserve_phps();
+            $this->_parse();
+            $this->_restore_phps();
+            file_put_contents($this->_cache_path, $this->_contents);
+            log_message('info', 'ZAQ: Parsed view ' . $view);
+        } else {
+            log_message('info', 'ZAQ: Built view ' . $view . ' from cache');
+        }
+
+        $output = $this->CI->load->view($this->_cache_file, $data, TRUE);
+        
+        if(!$this->_enable_cache) {
+            unlink($this->_cache_path);
         }
         
-        $this->_zaq_file = md5($view_file);
-        $this->_zaq_path = $this->_config['zaq_cache_dir'] . '/' . $this->_zaq_file;
-
-        $this->_contents = file_get_contents($view_file);
-
-        $this->_preserve_phps();
-        $this->_parse();
-        $this->_restore_phps();
-        $this->_fix_reference();
-
-        $vars = $this->CI->load->get_vars();
-        $data = array_merge($vars, $this->_get_object_var($data));
-        extract($data);
-        file_put_contents($this->_zaq_path, $this->_contents);
-        $time_end = microtime(TRUE);
-        ob_start();
-        include $this->_zaq_path;
-        $output = ob_get_contents();
-        @ob_end_clean();
-        unlink($this->_zaq_path);
-
-        log_message('info', 'Zaq: ' . $view . ' parsed in ' . ($time_end - $time_start) . ' seconds.');
+        $this->CI->benchmark->mark('zaq_parse_end');
         if ($return) {
             return $output;
         }
         $this->CI->output->append_output($output);
+    }
+
+    protected function _cache_exists($cache_path) {
+        if (is_file($cache_path)) {
+            return TRUE;
+        }
+        return FALSE;
+    }
+
+    protected function _cache_valid($view_path, $cache_path) {
+        if (!$this->_cache_exists($cache_path)) {
+            return FALSE;
+        }
+        $view_mtime = filemtime($view_path);
+        $cache_mtime = filemtime($cache_path);
+        return $cache_mtime >= $view_mtime;
     }
 
     protected function _parse() {
@@ -101,12 +123,11 @@ class Zaq {
         }
     }
 
-    protected function _fix_reference() {
-        $this->_contents = str_replace('$this', '$this->CI', $this->_contents);
-    }
-
     protected function _process($matches) {
         $this->_code_raw = trim($matches[1]);
+        if (in_array($this->_code_raw, $this->_exceptions)) {
+            return $this->_l_delimiter . $this->_code_raw . $this->_r_delimiter;
+        }
         $this->_preserve_strings();
         $this->_expand();
         $this->_trim();
@@ -182,13 +203,13 @@ class Zaq {
             $pos++;
         }
     }
-    
+
     protected function _unshift() {
         foreach ($this->_to_unshift as $unshift) {
             array_unshift($this->_code_parsed_parts, $unshift);
         }
     }
-    
+
     protected function _push() {
         foreach ($this->_to_push as $push) {
             array_push($this->_code_parsed_parts, $push);
@@ -245,7 +266,7 @@ class Zaq {
         if (preg_match('/^\w.*/', $code)) {
             $next = $position + 1;
             $prev = $position - 1;
-            if ((isset($this->_code_raw_parts[$next]) AND $this->_code_raw_parts[$next] == '(') OR (isset($this->_code_raw_parts[$prev]) AND $this->_code_raw_parts[$prev] == '->') ) {
+            if ((isset($this->_code_raw_parts[$next]) AND $this->_code_raw_parts[$next] == '(') OR ( isset($this->_code_raw_parts[$prev]) AND $this->_code_raw_parts[$prev] == '->')) {
                 return $code;
             }
             $code = '$' . $code;
@@ -267,16 +288,23 @@ class Zaq {
         $this->_set_delimiter_patterns();
     }
 
-    protected function _get_object_var($object) {
-        return is_object($object) ? get_object_vars($object) : $object;
+    protected function _check_cache_dir() {
+        if (!is_dir($this->_cache_dir)) {
+            mkdir($this->_cache_dir);
+        }
+        if (!is_writable($this->_cache_dir)) {
+            die('Cache directory is not writable.');
+        }
+        if (!is_dir($this->_cache_dir . 'views')) {
+            mkdir($this->_cache_dir . 'views');
+        }
     }
 
-    protected function _check_cache_dir() {
-        if (!is_dir($this->_config['zaq_cache_dir'])) {
-            mkdir($this->_config['zaq_cache_dir']);
-        }
-        if (!is_writable($this->_config['zaq_cache_dir'])) {
-            die('Cache directory is not writable.');
+    public function add_exception($val) {
+        if (is_array($val)) {
+            $this->_exceptions = array_merge($this->_exceptions, $val);
+        } else {
+            array_push($this->_exceptions, $val);
         }
     }
 
