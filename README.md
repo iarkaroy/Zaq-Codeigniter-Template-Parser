@@ -1,106 +1,38 @@
 Zaq: Codeigniter Template Parser Engine
 =======================================
 
-Zaq is a PHP based template parser engine developed to work with Codeigniter.
+Zaq is a PHP based template parser engine developed to work with Codeigniter. This library has been developed for developers to integrate php codes in views easily. Using this library will also allow the view file to be more readable. View files in Codeigniter (or in any other framework following MVC) always contains both html and php codes which make them a bit harder to read. This problem can be eradicated by using a parser engine which makes the view files a lot more easier to work with.
 
+Codeigniter, by default, comes with an optional template parser. But, unfortunately, that one does not provide sufficient pseudo markup to work with. Zaq, without doubt, is able to provide much more flexibility while building view files with pseudo markup to replace php codes.
 
-Installation
-------------
+Let's take a look at Zaq's insight and usage.
 
-1. [Download Zaq](http://github.com/iarkaroy/Zaq-Codeigniter-Template-Parser/archive/master.zip).
+<br>
 
-2. Copy libraries/Zaq.php to your application/libraries/ folder
+## Installation
 
-3. Copy config/zaq.php to your application/config folder.
+1. [**Download Zaq**](https://github.com/iarkaroy/Zaq-Codeigniter-Template-Parser/archive/master.zip)
 
-4. Create the folder if not exists:
+2. Copy `libraries/Zaq.php` to your `application/libraries/` folder
 
-	application/cache
+3. Copy `config/zaq.php` to your `application/config/` folder.
 
-5. Set application/cache writable.
+4. Create the folder if not exists: `application/cache`
 
+5. Set `application/cache` writable.
 
-Initialization
---------------
+<br>
 
-```php
-$this->load->library('zaq');
-```
+## Initialization
 
+Like other libraries in CodeIgniter, the Zaq library class is initialized in your controller using the `$this->load->library()` method:
 
-Parse View Syntax
------------------
+    $this->load->library('zaq');
 
-```php
-$this->zaq->parse( $view, $data = array(), $return = FALSE );
-```
+Or you can autoload the library in `autoload.php`
 
+Once loaded, the Zaq library object will be available using: `$this->zaq`
 
-Usage
------
+<br>
 
-#### Intended Code
-```php
-<?php if ( $products ) : ?>
-    <ul>
-    <?php foreach ( $products as $product ) : ?>
-        <li><a href="<?php echo $product['link'] ; ?>"><?php echo $product['title'] ; ?> (<?php echo $product['price'] ; ?>)</a></li>
-    <?php endforeach ; ?>
-    </ul>
-<?php else : ?>
-    <span>No product found.</span>
-<?php endif ; ?>
-```
-
-#### Zaq Code
-```
-{if products}
-    <ul>
-    {foreach products as product}
-        <li><a href="{product[link]}">{product[title]} ({product[price]})</a></li>
-    {/foreach}
-    </ul>
-{else}
-    <span>No product found.</span>
-{/if}
-```
-
-#### Intended Code
-```php
-<ul>
-<?php foreach ( $options as $item => $value ) : ?>
-    <li><?php echo $item ; ?> => <?php echo $value ; ?></li>
-<?php endforeach ; ?>
-</ul>
-```
-
-#### Zaq Code
-```
-<ul>
-{foreach options as item = value}
-    <li>{item} => {value}</li>
-{/foreach}
-</ul>
-```
-
-#### More...
-````
-{date('Y-m-d H:i:s', now)}
-<?php echo date ( 'Y-m-d H:i:s' , $now ) ; ?>
-
-{time()}
-<?php echo time ( ) ; ?>
-
-{fname . lname}
-<?php echo $fname . $lname ; ?>
-
-{books->get_by_author(author)->first()->title}
-<?php echo $books -> get_by_author( $author ) -> first() -> title ; ?>
-````
-
-For constants, use #...
-```
-{if defined('APP_VERSION') && #APP_VERSION > 2.0}
-	... do something ...
-{/if}
-```
+For usage instructions and more, visit [How to use Zaq: Codeigniter Template Parser Engine](http://www.arkaroy.net/blog/how-to-use-zaq-codeigniter-template-parser/)
